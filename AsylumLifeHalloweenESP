@@ -1,0 +1,103 @@
+--// ScavengerHunt içindeki HER ŞEYİ ESP'le
+local WS = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LP = Players.LocalPlayer
+
+-- Ayarlar
+local CONFIG = {
+    FillColor      = Color3.fromRGB(255, 140, 0),   -- turuncu
+    OutlineColor   = Color3.fromRGB(255, 220, 0),   -- sarı
+    FillTrans      = 0.5,
+    OutlineTrans   = 0,
+    StudsOffset    = Vector3.new(0, 2.5, 0),
+    ShowName       = true,
+    ShowDistance   = true,
+}
+
+local tracked = {}   -- [part] = true
+
+local function addESP(part)
+    if not part:IsA("BasePart") then return end
+    if tracked[part] then return end
+    tracked[part] = true
+
+    -- Highlight
+    local hl = Instance.new("Highlight")
+    hl.Name              = "SH_ESP_HL"
+    hl.Adornee           = part
+    hl.FillColor         = CONFIG.FillColor
+    hl.OutlineColor      = CONFIG.OutlineColor
+    hl.FillTransparency  = CONFIG.FillTrans
+    hl.OutlineTransparency = CONFIG.OutlineTrans
+    hl.DepthMode         = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent            = part
+
+    -- Billboard (isim + distance)
+    local bb = Instance.new("BillboardGui")
+    bb.Name        = "SH_ESP_BB"
+    bb.Adornee     = part
+    bb.Size        = UDim2.new(0, 200, 0, 50)
+    bb.StudsOffset = CONFIG.StudsOffset
+    bb.AlwaysOnTop = true
+    bb.Parent      = part
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Name                 = "L"
+    lbl.Size                 = UDim2.new(1, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.TextColor3           = CONFIG.OutlineColor
+    lbl.TextStrokeTransparency = 0
+    lbl.TextStrokeColor3     = Color3.new(0, 0, 0)
+    lbl.Font                 = Enum.Font.GothamBold
+    lbl.TextScaled           = true
+    lbl.Text                 = ""
+    lbl.Parent               = bb
+end
+
+-- ScavengerHunt'ı bul/bekle
+local hunt = WS:WaitForChild("ScavengerHunt", 30)
+if not hunt then
+    warn("[ESP] ScavengerHunt bulunamadı!")
+    return
+end
+print("[ESP] ScavengerHunt bulundu:", hunt:GetFullName())
+
+-- Mevcut her şeyi tara
+for _, obj in ipairs(hunt:GetDescendants()) do
+    addESP(obj)
+end
+
+-- Sonradan eklenenleri yakala
+hunt.DescendantAdded:Connect(function(obj)
+    task.wait(0.05)
+    addESP(obj)
+end)
+
+-- Distance güncelleme loop'u
+RunService.RenderStepped:Connect(function()
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    for part in pairs(tracked) do
+        if not part.Parent then
+            tracked[part] = nil
+            continue
+        end
+
+        local bb  = part:FindFirstChild("SH_ESP_BB")
+        local lbl = bb and bb:FindFirstChild("L")
+        if lbl then
+            local dist = (root.Position - part.Position).Magnitude
+            local txt = ""
+            if CONFIG.ShowName     then txt = part.Name end
+            if CONFIG.ShowDistance then
+                txt = txt .. (txt ~= "" and "\n" or "") .. string.format("[%.0f studs]", dist)
+            end
+            lbl.Text = txt
+        end
+    end
+end)
+
+print("[ESP] Aktif! ScavengerHunt içindeki her şey ESP'lendi.")
